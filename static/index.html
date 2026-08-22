@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>CDA Generator</title>
+  <link rel="stylesheet" href="/static/styles.css" />
+</head>
+<body>
+  <header>
+    <p class="eyebrow">RealtyOne Plus</p>
+    <h1>Commission Disbursement Authorization</h1>
+    <p class="lede">Upload a ROP data worksheet. Review the parsed fields, then download a formal CDA PDF.</p>
+  </header>
+
+  <main>
+    <section class="card dropzone" id="dropzone">
+      <input id="file" type="file" accept=".xlsx,.xlsm" />
+      <p><strong>Drop an Excel file here</strong> or click to choose</p>
+      <p class="hint">Expected format: ROP DATA WORKSHEET (.xlsx)</p>
+      <p id="filename" class="filename"></p>
+    </section>
+
+    <section class="card hidden" id="preview-card">
+      <div class="section-head">
+        <h2>Parsed transaction</h2>
+        <span id="warnings" class="warnings"></span>
+      </div>
+      <div class="grid">
+        <label>Property <input id="property_address" /></label>
+        <label>Close date <input id="close_date" /></label>
+        <label>Sale price <input id="sale_price" /></label>
+        <label>MLS <input id="mls" /></label>
+        <label>Seller <input id="seller" /></label>
+        <label>Buyer <input id="buyer" /></label>
+        <label>Selling agent <input id="selling_agent" /></label>
+        <label>Gross commission <input id="gross_display" readonly /></label>
+        <label>Escrow agent <input id="closer" /></label>
+        <label>Title company <input id="title_company" /></label>
+        <label>Phone <input id="closer_phone" /></label>
+        <label>Email <input id="closer_email" /></label>
+        <label>Escrow / GF # <input id="escrow_no" /></label>
+        <label>Today / signature date <input id="today" /></label>
+        <label>Closing fee <input id="broker_process_fees" /></label>
+        <label>Agent commission <input id="selling_agent_commission" /></label>
+        <label class="wide">Agent payee mailing address <input id="agent_payee_address" /></label>
+        <label>Broker name <input id="broker_name" /></label>
+        <label class="wide">Brokerage mail-to <input id="brokerage_mail_address" /></label>
+      </div>
+      <div class="actions">
+        <button type="button" id="generate">Download CDA PDF</button>
+      </div>
+    </section>
+  </main>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>

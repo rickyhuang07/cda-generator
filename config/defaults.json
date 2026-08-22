@@ -1,0 +1,15 @@
+{
+  "brokerage": {
+    "name": "RealtyOne Plus, LLC",
+    "address_line1": "3130 Grants Lake BLVD #17272",
+    "address_line2": "Sugar Land, TX 77496",
+    "email": "RealtyOnePlus@hotmail.com",
+    "phone": "(281) 410-8725"
+  },
+  "broker": {
+    "name": "Jinglin Xu"
+  },
+  "agent_payee_addresses": {
+    "Wanhai Liu": "8615 CAPE ROYAL DR, CYPRESS TX 77433"
+  }
+}

@@ -1,0 +1,97 @@
+:root {
+  --navy: #1b365d;
+  --gold: #c5a46e;
+  --paper: #f7f4ee;
+  --ink: #1a1a1a;
+  --muted: #5c6570;
+}
+
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  font-family: "Iowan Old Style", "Palatino Linotype", Palatino, serif;
+  background: radial-gradient(circle at top, #fbf8f2, #ece6da 55%, #e4ddd0);
+  color: var(--ink);
+}
+header, main {
+  max-width: 880px;
+  margin: 0 auto;
+  padding: 0 1.25rem;
+}
+header { padding-top: 2.5rem; }
+.eyebrow {
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--gold);
+  font-size: 0.75rem;
+  margin: 0 0 0.4rem;
+}
+h1 { font-size: 2rem; margin: 0 0 0.4rem; color: var(--navy); }
+.lede { color: var(--muted); margin: 0 0 1.5rem; }
+.card {
+  background: white;
+  border: 1px solid #e3dccf;
+  border-radius: 12px;
+  padding: 1.25rem 1.4rem;
+  margin-bottom: 1.25rem;
+  box-shadow: 0 10px 30px rgba(27, 54, 93, 0.06);
+}
+.dropzone {
+  text-align: center;
+  border: 1.5px dashed var(--gold);
+  cursor: pointer;
+  position: relative;
+}
+.dropzone.drag { background: var(--paper); }
+.dropzone input {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+.hint, .filename { color: var(--muted); font-size: 0.92rem; }
+.hidden { display: none; }
+.section-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  align-items: baseline;
+}
+h2 { margin: 0 0 1rem; color: var(--navy); font-size: 1.15rem; }
+.warnings { color: #9a3412; font-size: 0.9rem; }
+.grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem 1rem;
+}
+label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+input {
+  font: inherit;
+  padding: 0.45rem 0.55rem;
+  border: 1px solid #d8d1c5;
+  border-radius: 6px;
+  color: var(--ink);
+}
+input:read-only { background: var(--paper); }
+.wide { grid-column: 1 / -1; }
+.actions { margin-top: 1.1rem; }
+button {
+  background: var(--navy);
+  color: white;
+  border: 0;
+  border-radius: 8px;
+  padding: 0.7rem 1.2rem;
+  font: inherit;
+  cursor: pointer;
+}
+button:hover { filter: brightness(1.08); }
+@media (max-width: 700px) {
+  .grid { grid-template-columns: 1fr; }
+  .wide { grid-column: auto; }
+}
