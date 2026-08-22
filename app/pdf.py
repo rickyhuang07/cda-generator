@@ -243,28 +243,26 @@ def build_cda_pdf(tx: Transaction) -> bytes:
     ]
 
     # Signature Block
-    sig_image = Image("static/signature.png", width=120, height=35)
+    # 1. Signature image
+    sig_image = Image("static/signature.png", width=90, height=25)
     sig_image.hAlign = 'LEFT'
+
+    # 3-Column Table: Left (Signature), Middle (Spacer Gap), Right (Date)
     sig = Table(
         [
             [
                 sig_image,
-                "",
-            ],
-            [
-                Paragraph("______________________", styles["body"]),
-                Paragraph("______________________", styles["body"]),
+                "",  # Middle gap
+                Paragraph(format_date(tx.today), styles["body"]),
             ],
             [
                 Paragraph(f"Broker – {tx.broker_name or 'Jinglin Xu'}", styles["body"]),
+                "",  # Middle gap
                 Paragraph("Date", styles["body"]),
             ],
-            [
-                "",
-                Paragraph(format_date(tx.today), styles["body"]),
-            ],
         ],
-        colWidths=[3.5 * inch, 3.5 * inch],
+        # CHANGED: Shortened signature line to 2.0 in, date line to 1.4 in, expanded gap to 3.0 in
+        colWidths=[2.0 * inch, 3.0 * inch, 1.4 * inch], 
     )
     sig.setStyle(
         TableStyle(
@@ -273,7 +271,12 @@ def build_cda_pdf(tx: Transaction) -> bytes:
                 ("LEFTPADDING", (0, 0), (-1, -1), 0),
                 ("RIGHTPADDING", (0, 0), (-1, -1), 0),
                 ("TOPPADDING", (0, 0), (-1, -1), 0),
-                ("BOTTOMPADDING", (0, 0), (-1, -1), 2),
+                ("BOTTOMPADDING", (0, 0), (-1, 0), 2),  # Tight space above the line
+                ("BOTTOMPADDING", (0, 1), (-1, 1), 0),
+                ("TOPPADDING", (0, 1), (-1, 1), 3),     # Space under the line before labels
+                # Draw underline ONLY on col 0 (signature) and col 2 (date), leaving col 1 blank
+                ("LINEBELOW", (0, 0), (0, 0), 0.75, black),
+                ("LINEBELOW", (2, 0), (2, 0), 0.75, black),
             ]
         )
     )
