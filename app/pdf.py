@@ -9,6 +9,7 @@ from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from reportlab.lib.units import inch
 from reportlab.platypus import (
     HRFlowable,
+    Image,
     Paragraph,
     SimpleDocTemplate,
     Spacer,
@@ -80,15 +81,6 @@ def _styles() -> dict[str, ParagraphStyle]:
             alignment=TA_RIGHT,
             leading=13,
         ),
-        "center": ParagraphStyle(
-            "CdaCenter",
-            parent=base["Normal"],
-            fontName="Times-Roman",
-            fontSize=9,
-            textColor=MUTED,
-            alignment=TA_CENTER,
-            leading=12,
-        ),
         "money": ParagraphStyle(
             "CdaMoney",
             parent=base["Normal"],
@@ -97,15 +89,6 @@ def _styles() -> dict[str, ParagraphStyle]:
             alignment=TA_RIGHT,
             textColor=NAVY,
             leading=14,
-        ),
-        "footer": ParagraphStyle(
-            "CdaFooter",
-            parent=base["Normal"],
-            fontName="Times-Roman",
-            fontSize=8.5,
-            textColor=MUTED,
-            alignment=TA_LEFT,
-            leading=11,
         ),
     }
 
@@ -145,7 +128,7 @@ def _kv_table(pairs: list[tuple[str, str]], styles: dict[str, ParagraphStyle], c
                 ("VALIGN", (0, 0), (-1, -1), "TOP"),
                 ("LEFTPADDING", (0, 0), (-1, -1), 0),
                 ("RIGHTPADDING", (0, 0), (-1, -1), 0),
-                    ("BOTTOMPADDING", (0, 0), (-1, -1), 3),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 3),
             ]
         )
     )
@@ -160,8 +143,8 @@ def _money_row(label: str, amount: str, styles: dict[str, ParagraphStyle], empha
         ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
         ("LEFTPADDING", (0, 0), (-1, -1), 8),
         ("RIGHTPADDING", (0, 0), (-1, -1), 8),
-                ("TOPPADDING", (0, 0), (-1, -1), 3),
-                ("BOTTOMPADDING", (0, 0), (-1, -1), 3),
+        ("TOPPADDING", (0, 0), (-1, -1), 3),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 3),
     ]
     if emphasis:
         cmds.append(("BACKGROUND", (0, 0), (-1, -1), LIGHT))
@@ -185,41 +168,50 @@ def build_cda_pdf(tx: Transaction) -> bytes:
 
     title_company = (tx.title_company or "").replace(" / ", ", ")
     agent = tx.selling_agent or "Selling Agent"
+    
     story = [
         Paragraph("Commission Disbursement Authorization", styles["title"]),
         HRFlowable(width="100%", thickness=2, color=NAVY, spaceAfter=1),
         HRFlowable(width="100%", thickness=0.75, color=RULE, spaceBefore=0, spaceAfter=4),
-        Paragraph("Escrow Info", styles["section"]),
+        
+        # Escrow Section
+        Paragraph("Escrow Info:", styles["section"]),
         _kv_table(
             [
-                ("Escrow Agent", tx.closer),
-                ("Title Company", title_company),
-                ("Phone", tx.closer_phone),
-                ("Email", tx.closer_email),
+                ("Escrow Agent:", tx.closer),
+                ("Title Company:", title_company),
+                ("Phone:", tx.closer_phone),
+                ("Email:", tx.closer_email),
             ],
             styles,
         ),
-        Paragraph("Transaction Info", styles["section"]),
+        
+        # Transaction Section
+        Paragraph("Transaction Info:", styles["section"]),
         _kv_table(
             [
-                ("Escrow No", tx.escrow_no),
-                ("Gross Commission", format_money(tx.gross_commission)),
-                ("MLS", tx.mls),
-                ("Sale Price", format_money(tx.sale_price)),
-                ("Close Date", format_date(tx.close_date)),
-                ("Property", tx.property_address),
-                ("Seller", tx.seller),
-                ("Buyer", tx.buyer),
-                ("Selling Agent", tx.selling_agent),
+                ("Escrow No:", tx.escrow_no),
+                ("Gross Commission:", format_money(tx.gross_commission)),
+                ("MLS:", tx.mls),
+                ("Sale Price:", format_money(tx.sale_price)),
+                ("Close Date:", format_date(tx.close_date)),
+                ("Property:", tx.property_address),
+                ("Seller:", tx.seller),
+                ("Buyer:", tx.buyer),
+                ("Selling Agent:", tx.selling_agent),
             ],
             styles,
         ),
+        
+        # Commission Breakdown Section
         Paragraph("Commission Breakdown", styles["section"]),
         _money_row("Brokerage Gross Commission", format_money(tx.gross_commission), styles, emphasis=True),
         Spacer(1, 4),
+        
         Paragraph("Selling Agent Commission", styles["section"]),
         _money_row(f"{possessive(agent)} Commission", format_money(tx.gross_commission), styles),
         Spacer(1, 4),
+        
         Paragraph("Additional Agent Closing Fees", styles["section"]),
         Paragraph(
             "*These fees are paid to the brokerage and are reflected in the Net Amount Due to Brokerage line item below",
@@ -228,15 +220,17 @@ def build_cda_pdf(tx: Transaction) -> bytes:
         Spacer(1, 2),
         _money_row("Closing Fee", f"({format_money(tx.broker_process_fees)})", styles),
         Spacer(1, 4),
+        
         Paragraph("Final Selling Agent Commission", styles["section"]),
         _money_row(f"{possessive(agent)} Commission", format_money(tx.net_due_agent), styles, emphasis=True),
         Spacer(1, 4),
+        
         Paragraph("Final Commission Breakdown", styles["section"]),
         _money_row("Total Due to Brokerage", format_money(tx.gross_commission), styles),
         Spacer(1, 6),
         _money_row("Net Amount Due to Brokerage:", format_money(tx.net_due_brokerage), styles, emphasis=True),
         Paragraph(
-            f"Please mail check to {tx.brokerage_name}, {tx.brokerage_mail_address}",
+            f"Please mail check to {tx.brokerage_name or 'RealtyOne Plus, LLC'}, {tx.brokerage_mail_address}",
             styles["muted"],
         ),
         Spacer(1, 4),
@@ -248,14 +242,21 @@ def build_cda_pdf(tx: Transaction) -> bytes:
         Spacer(1, 14),
     ]
 
+    # Signature Block
+    sig_image = Image("static/signature.png", width=120, height=35)
+    sig_image.hAlign = 'LEFT'
     sig = Table(
         [
+            [
+                sig_image,
+                "",
+            ],
             [
                 Paragraph("______________________", styles["body"]),
                 Paragraph("______________________", styles["body"]),
             ],
             [
-                Paragraph(f"Broker – {tx.broker_name}", styles["body"]),
+                Paragraph(f"Broker – {tx.broker_name or 'Jinglin Xu'}", styles["body"]),
                 Paragraph("Date", styles["body"]),
             ],
             [
@@ -268,8 +269,9 @@ def build_cda_pdf(tx: Transaction) -> bytes:
     sig.setStyle(
         TableStyle(
             [
-                ("VALIGN", (0, 0), (-1, -1), "TOP"),
+                ("VALIGN", (0, 0), (-1, -1), "BOTTOM"),
                 ("LEFTPADDING", (0, 0), (-1, -1), 0),
+                ("RIGHTPADDING", (0, 0), (-1, -1), 0),
                 ("TOPPADDING", (0, 0), (-1, -1), 0),
                 ("BOTTOMPADDING", (0, 0), (-1, -1), 2),
             ]
@@ -277,6 +279,7 @@ def build_cda_pdf(tx: Transaction) -> bytes:
     )
     story.append(sig)
 
+    # Footer Drawing Handler
     def _footer(canvas, _doc):
         canvas.saveState()
         canvas.setStrokeColor(LINE)
@@ -286,9 +289,9 @@ def build_cda_pdf(tx: Transaction) -> bytes:
         canvas.setFont("Times-Roman", 8.5)
         y = 0.66 * inch
         for line in (
-            tx.brokerage_name,
-            tx.brokerage_mail_address,
-            f"{tx.brokerage_email}   {tx.brokerage_phone}",
+            tx.brokerage_name or "RealtyOne Plus, LLC",
+            tx.brokerage_mail_address or "3130 Grants Lake BLVD #17272, Sugar Land, TX 77496",
+            f"{tx.brokerage_email or 'RealtyOnePlus@hotmail.com'}   {tx.brokerage_phone or '(281) 410-8725'}",
         ):
             if line:
                 canvas.drawString(0.7 * inch, y, line)
