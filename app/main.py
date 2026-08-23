@@ -98,7 +98,9 @@ def index() -> FileResponse:
 
 @app.get("/owner")
 def owner() -> FileResponse:
-    return FileResponse(STATIC / "owner.html")
+    response = FileResponse(STATIC / "owner.html")
+    response.delete_cookie("owner_session")
+    return response
 
 
 @app.get("/health")
@@ -116,7 +118,7 @@ def owner_login(password: str = Form(...)):
         raise HTTPException(status_code=401, detail="Invalid owner password")
     expected = hmac.new(SESSION_SECRET.encode(), b"owner", hashlib.sha256).hexdigest()
     response = JSONResponse({"message": "Signed in"})
-    response.set_cookie("owner_session", expected, httponly=True, secure=COOKIE_SECURE, samesite="lax", max_age=86400)
+    response.set_cookie("owner_session", expected, httponly=True, secure=COOKIE_SECURE, samesite="lax")
     return response
 
 

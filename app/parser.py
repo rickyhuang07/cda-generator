@@ -71,6 +71,14 @@ def _to_text(value: Any) -> str:
     return _norm(value)
 
 
+def _split_title_company(value: Any) -> tuple[str, str]:
+    text = _to_text(value)
+    if " / " not in text:
+        return text, ""
+    company, address = text.split(" / ", 1)
+    return company.strip(), address.strip()
+
+
 def _cell_map(ws) -> dict[str, Any]:
     labels: dict[str, list[tuple[int, int, Any]]] = {}
     for row in ws.iter_rows(min_row=1, max_row=40, min_col=1, max_col=6):
@@ -145,6 +153,7 @@ def transaction_from_overrides(overrides: dict[str, Any] | None = None) -> Trans
     defaults = load_defaults()
     brokerage = defaults.get("brokerage", {})
     broker = defaults.get("broker", {})
+
     tx = Transaction(
         agent_payee_address="",
         broker_name=broker.get("name", ""),
@@ -182,6 +191,11 @@ def parse_rop_xlsx(path: Path, overrides: dict[str, Any] | None = None) -> Trans
     brokerage = defaults.get("brokerage", {})
     broker = defaults.get("broker", {})
     payees = defaults.get("agent_payee_addresses", {})
+    title_company_value = labeled("TITLE CO.", "TITLE COMPANY", "TITLE CO./ADDRESS")
+    title_company, title_company_address = _split_title_company(title_company_value)
+    explicit_title_address = labeled("TITLE CO. ADDRESS", "TITLE COMPANY ADDRESS")
+    if explicit_title_address:
+        title_company_address = _to_text(explicit_title_address)
 
     tx = Transaction(
         today=_to_date(labeled("TODAY'S DATE", "TODAYS DATE")),
@@ -203,7 +217,7 @@ def parse_rop_xlsx(path: Path, overrides: dict[str, Any] | None = None) -> Trans
         selling_agent=selling_agent,
         selling_agent_phone=_to_text(labeled_nth("PHONE #", 3) or labeled_nth("PHONE#", 3)),
         selling_agent_email=_to_text(labeled_nth("EMAIL", 1)),
-        title_company=_to_text(labeled("TITLE CO.", "TITLE COMPANY", "TITLE CO./ADDRESS")),
+        title_company=title_company,
         closer=_to_text(labeled("CLOSER")),
         closer_email=_to_text(labeled_nth("EMAIL", 2)),
         closer_phone=_to_text(labeled_nth("PHONE #", 4) or labeled_nth("PHONE#", 4)),
@@ -224,7 +238,7 @@ def parse_rop_xlsx(path: Path, overrides: dict[str, Any] | None = None) -> Trans
         brokerage_email=brokerage.get("email", ""),
         brokerage_phone=brokerage.get("phone", ""),
     )
-    tx.title_company_address = _to_text(labeled("TITLE CO. ADDRESS", "TITLE COMPANY ADDRESS"))
+    tx.title_company_address = title_company_address
 
     if not tx.agent_payee_address:
         tx.warnings.append(

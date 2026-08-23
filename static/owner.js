@@ -9,6 +9,25 @@ document.addEventListener("DOMContentLoaded", () => {
   const ownerContent = document.getElementById("owner-content");
   const loginForm = document.getElementById("login-form");
   const loginMessage = document.getElementById("login-message");
+  const reviewFields = [
+    ["closer", "Escrow Agent"],
+    ["closer_email", "Escrow Agent's Email"],
+    ["closer_phone", "Escrow Agent's Phone"],
+    ["title_company", "Title Company"],
+    ["title_company_address", "Title Company Address"],
+    ["escrow_no", "Escrow Number"],
+    ["gross_commission", "Gross Commission"],
+    ["mls", "MLS"],
+    ["sale_price", "Sale Price"],
+    ["property_address", "Property Address"],
+    ["buyer", "Buyer / Tenant"],
+    ["close_date", "Close Date"],
+    ["seller", "Seller / Landlord"],
+    ["selling_agent", "Selling Agent"],
+    ["broker_process_fees", "Broker Process Fees"],
+    ["selling_agent_commission", "Agent Commission"],
+    ["agent_payee_address", "Agent Payee Mailing Address"],
+  ];
   let selectedId = null;
 
   async function loadSubmissions() {
@@ -38,12 +57,11 @@ document.addEventListener("DOMContentLoaded", () => {
     empty.classList.add("hidden");
     detail.classList.remove("hidden");
     detail.replaceChildren();
-    Object.entries(data.preview)
-      .filter(([key]) => !key.endsWith("_fmt") && !["warnings", "_gross_commission_override"].includes(key))
-      .forEach(([key, value]) => {
+    reviewFields.forEach(([key, labelText]) => {
+        const value = data.preview[key];
         const item = document.createElement("div");
         const label = document.createElement("span");
-        label.textContent = key.replaceAll("_", " ");
+        label.textContent = labelText;
         const content = document.createElement("strong");
         content.textContent = value ?? "";
         item.append(label, content);
