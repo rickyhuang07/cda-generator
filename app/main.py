@@ -4,14 +4,15 @@ import json
 import hashlib
 import hmac
 import os
-import sqlite3
 import uuid
+from datetime import datetime, timezone
 from pathlib import Path
 from tempfile import NamedTemporaryFile
 
 from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
+from sqlalchemy import Column, LargeBinary, MetaData, String, Table, Text, create_engine, delete, select, update
 from dotenv import load_dotenv
 
 from app.parser import parse_rop_xlsx, transaction_from_overrides
@@ -21,9 +22,27 @@ ROOT = Path(__file__).resolve().parent.parent
 STATIC = ROOT / "static"
 load_dotenv(ROOT / ".env")
 DB_PATH = Path(os.getenv("DATABASE_PATH", ROOT / "submissions.db"))
+DATABASE_URL = os.getenv("DATABASE_URL", f"sqlite:///{DB_PATH}")
+if DATABASE_URL.startswith(("postgres://", "postgresql://")):
+    DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql+psycopg://", 1).replace("postgresql://", "postgresql+psycopg://", 1)
 OWNER_PASSWORD = os.getenv("OWNER_PASSWORD", "")
 SESSION_SECRET = os.getenv("SESSION_SECRET", "local-development-secret")
 COOKIE_SECURE = os.getenv("COOKIE_SECURE", "false").lower() == "true"
+engine = create_engine(
+    DATABASE_URL,
+    connect_args={"check_same_thread": False} if DATABASE_URL.startswith("sqlite") else {},
+)
+metadata = MetaData()
+submissions_table = Table(
+    "submissions",
+    metadata,
+    Column("id", String(32), primary_key=True),
+    Column("created_at", String(40), nullable=False),
+    Column("status", String(20), nullable=False),
+    Column("filename", String(255)),
+    Column("workbook", LargeBinary),
+    Column("overrides", Text, nullable=False),
+)
 
 app = FastAPI(title="CDA Generator", version="1.0.0")
 app.mount("/static", StaticFiles(directory=STATIC), name="static")
@@ -34,23 +53,16 @@ async def internal_error(request: Request, exc: Exception):
     return JSONResponse(status_code=500, content={"detail": str(exc) or "Internal server error"})
 
 
-def db() -> sqlite3.Connection:
-    DB_PATH.parent.mkdir(parents=True, exist_ok=True)
-    connection = sqlite3.connect(DB_PATH)
-    connection.row_factory = sqlite3.Row
-    connection.execute(
-        """CREATE TABLE IF NOT EXISTS submissions (
-            id TEXT PRIMARY KEY, created_at TEXT NOT NULL, status TEXT NOT NULL,
-            filename TEXT, workbook BLOB, overrides TEXT NOT NULL
-        )"""
-    )
-    connection.commit()
-    return connection
+def db():
+    if DATABASE_URL.startswith("sqlite"):
+        DB_PATH.parent.mkdir(parents=True, exist_ok=True)
+    metadata.create_all(engine)
+    return engine
 
 
 def require_owner(request: Request) -> None:
-    if not OWNER_PASSWORD:
-        return
+    if not OWNER_PASSWORD or not SESSION_SECRET or SESSION_SECRET == "local-development-secret":
+        raise HTTPException(status_code=503, detail="Owner authentication is not configured")
     expected = hmac.new(SESSION_SECRET.encode(), b"owner", hashlib.sha256).hexdigest()
     if not hmac.compare_digest(request.cookies.get("owner_session", ""), expected):
         raise HTTPException(status_code=401, detail="Owner login required")
@@ -91,14 +103,16 @@ def owner() -> FileResponse:
 
 @app.get("/health")
 def health():
-    connection = db()
-    connection.close()
+    with db().connect() as connection:
+        connection.execute(select(1))
     return {"status": "ok"}
 
 
 @app.post("/api/owner/login")
 def owner_login(password: str = Form(...)):
-    if not OWNER_PASSWORD or not hmac.compare_digest(password, OWNER_PASSWORD):
+    if not OWNER_PASSWORD or not SESSION_SECRET or SESSION_SECRET == "local-development-secret":
+        raise HTTPException(status_code=503, detail="Owner authentication is not configured")
+    if not hmac.compare_digest(password, OWNER_PASSWORD):
         raise HTTPException(status_code=401, detail="Invalid owner password")
     expected = hmac.new(SESSION_SECRET.encode(), b"owner", hashlib.sha256).hexdigest()
     response = JSONResponse({"message": "Signed in"})
@@ -152,33 +166,36 @@ async def submit(
         tx = transaction_from_overrides(payload)
 
     submission_id = uuid.uuid4().hex[:12]
-    connection = db()
-    connection.execute(
-        "INSERT INTO submissions VALUES (?, datetime('now'), 'pending', ?, ?, ?)",
-        (submission_id, filename, workbook, json.dumps(payload)),
-    )
-    connection.commit()
-    connection.close()
+    with db().begin() as connection:
+        connection.execute(
+            submissions_table.insert().values(
+                id=submission_id,
+                created_at=datetime.now(timezone.utc).isoformat(),
+                status="pending",
+                filename=filename,
+                workbook=workbook,
+                overrides=json.dumps(payload),
+            )
+        )
     return {"id": submission_id, "message": "Submission sent for owner review."}
 
 
 @app.get("/api/submissions")
 def submissions(request: Request):
     require_owner(request)
-    connection = db()
-    rows = connection.execute(
-        "SELECT id, created_at, status, filename, overrides FROM submissions ORDER BY created_at DESC"
-    ).fetchall()
-    connection.close()
+    with db().connect() as connection:
+        rows = connection.execute(
+            select(submissions_table.c.id, submissions_table.c.created_at, submissions_table.c.status, submissions_table.c.filename, submissions_table.c.overrides)
+            .order_by(submissions_table.c.created_at.desc())
+        ).mappings().all()
     return [dict(row, overrides=json.loads(row["overrides"])) for row in rows]
 
 
 @app.get("/api/submissions/{submission_id}")
 def submission(submission_id: str, request: Request):
     require_owner(request)
-    connection = db()
-    row = connection.execute("SELECT * FROM submissions WHERE id = ?", (submission_id,)).fetchone()
-    connection.close()
+    with db().connect() as connection:
+        row = connection.execute(select(submissions_table).where(submissions_table.c.id == submission_id)).mappings().first()
     if not row:
         raise HTTPException(status_code=404, detail="Submission not found")
     return {"id": row["id"], "created_at": row["created_at"], "status": row["status"], "filename": row["filename"], "preview": submission_transaction(row).to_preview()}
@@ -187,16 +204,14 @@ def submission(submission_id: str, request: Request):
 @app.delete("/api/submissions/{submission_id}")
 def delete_submission(submission_id: str, request: Request):
     require_owner(request)
-    connection = db()
-    cursor = connection.execute("DELETE FROM submissions WHERE id = ?", (submission_id,))
-    connection.commit()
-    connection.close()
-    if cursor.rowcount == 0:
+    with db().begin() as connection:
+        result = connection.execute(delete(submissions_table).where(submissions_table.c.id == submission_id))
+    if result.rowcount == 0:
         raise HTTPException(status_code=404, detail="Submission not found")
     return {"id": submission_id, "message": "Submission deleted."}
 
 
-def submission_transaction(row: sqlite3.Row):
+def submission_transaction(row):
     payload = json.loads(row["overrides"])
     if row["workbook"]:
         with NamedTemporaryFile(suffix=".xlsx", delete=True) as tmp:
@@ -209,15 +224,12 @@ def submission_transaction(row: sqlite3.Row):
 @app.post("/api/submissions/{submission_id}/generate")
 def generate_submission(submission_id: str, request: Request):
     require_owner(request)
-    connection = db()
-    row = connection.execute("SELECT * FROM submissions WHERE id = ?", (submission_id,)).fetchone()
-    connection.close()
+    with db().connect() as connection:
+        row = connection.execute(select(submissions_table).where(submissions_table.c.id == submission_id)).mappings().first()
     if not row:
         raise HTTPException(status_code=404, detail="Submission not found")
     tx = submission_transaction(row)
     pdf = build_cda_pdf(tx)
-    connection = db()
-    connection.execute("UPDATE submissions SET status = 'generated' WHERE id = ?", (submission_id,))
-    connection.commit()
-    connection.close()
+    with db().begin() as connection:
+        connection.execute(update(submissions_table).where(submissions_table.c.id == submission_id).values(status="generated"))
     return Response(content=pdf, media_type="application/pdf", headers={"Content-Disposition": f'attachment; filename="{tx.suggested_filename()}"'})

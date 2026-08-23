@@ -23,10 +23,31 @@ The backend runs with Uvicorn and can be deployed with the included `Dockerfile`
 
 - `OWNER_PASSWORD`: required password for the owner workspace
 - `SESSION_SECRET`: long random value used to sign the owner session
-- `DATABASE_PATH`: persistent path for SQLite, such as `/data/submissions.db`
+- `DATABASE_URL`: PostgreSQL connection string from Supabase
+- `DATABASE_PATH`: local SQLite fallback when `DATABASE_URL` is omitted
 - `COOKIE_SECURE=true`: required when serving over HTTPS
 
-Mount a persistent volume at the directory used by `DATABASE_PATH`; otherwise submissions will be lost when the container restarts. The `/health` endpoint can be used for a hosting health check. A local `.env` file is supported for development and should never be committed.
+For SQLite deployments, mount a persistent volume at the directory used by `DATABASE_PATH`. For Supabase deployments, PostgreSQL provides persistent storage and no local database volume is needed. The `/health` endpoint can be used for a hosting health check. A local `.env` file is supported for development and should never be committed.
+
+### Supabase setup
+
+1. Create a Supabase project and set a database password.
+2. In Supabase, open **Project Settings > Database > Connect** and copy the connection string. Use the session pooler connection if your hosting provider does not support IPv6.
+3. Copy `.env.example` to `.env` and set `DATABASE_URL` to that connection string. The app accepts either `postgresql://...` or `postgresql+psycopg://...`.
+4. Set `OWNER_PASSWORD`, `SESSION_SECRET`, and `COOKIE_SECURE=true`.
+5. Install dependencies and start the app with `uvicorn app.main:app --host 0.0.0.0 --port 8000`.
+
+The app creates the `submissions` table automatically on startup. To transfer existing local SQLite submissions, set `DATABASE_URL` to Supabase, leave the local `submissions.db` in place, and run `python -m scripts.migrate_sqlite_to_postgres` once. Set `SQLITE_SOURCE` if the source database has another path.
+
+### Vercel deployment
+
+1. Push this project to GitHub, making sure `.env` and `submissions.db` are not committed.
+2. In Vercel, choose **Add New Project**, import the repository, and deploy it. The included `vercel.json` uses `api/index.py` as the FastAPI serverless entrypoint.
+3. In the Vercel project, open **Settings > Environment Variables** and add `DATABASE_URL`, `OWNER_PASSWORD`, `SESSION_SECRET`, and `COOKIE_SECURE=true` for Production.
+4. Set `DATABASE_URL` to the Supabase PostgreSQL connection string. Do not add `SUPABASE_SECRET_KEY` to frontend code or expose it in browser variables.
+5. Redeploy after adding the variables. Test `/health`, `/`, and `/owner` on the Vercel domain.
+
+Vercel's filesystem is not persistent, so production must use Supabase through `DATABASE_URL`; do not deploy with the SQLite fallback. Uploaded workbooks are stored in the `submissions` table in Supabase.
 
 An example worksheet and the original Word CDA are in `examples/`.
 
