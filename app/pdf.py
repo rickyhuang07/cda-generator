@@ -167,6 +167,7 @@ def build_cda_pdf(tx: Transaction) -> bytes:
     )
 
     title_company = (tx.title_company or "").replace(" / ", ", ")
+    title_company_address = (tx.title_company_address or "").replace(" / ", ", ")
     agent = tx.selling_agent or "Selling Agent"
     
     story = [
@@ -180,6 +181,7 @@ def build_cda_pdf(tx: Transaction) -> bytes:
             [
                 ("Escrow Agent:", tx.closer),
                 ("Title Company:", title_company),
+                ("Title Company Address:", title_company_address),
                 ("Phone:", tx.closer_phone),
                 ("Email:", tx.closer_email),
             ],

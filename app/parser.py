@@ -203,7 +203,7 @@ def parse_rop_xlsx(path: Path, overrides: dict[str, Any] | None = None) -> Trans
         selling_agent=selling_agent,
         selling_agent_phone=_to_text(labeled_nth("PHONE #", 3) or labeled_nth("PHONE#", 3)),
         selling_agent_email=_to_text(labeled_nth("EMAIL", 1)),
-        title_company=_to_text(labeled("TITLE CO./ADDRESS", "TITLE CO.", "TITLE COMPANY")),
+        title_company=_to_text(labeled("TITLE CO.", "TITLE COMPANY", "TITLE CO./ADDRESS")),
         closer=_to_text(labeled("CLOSER")),
         closer_email=_to_text(labeled_nth("EMAIL", 2)),
         closer_phone=_to_text(labeled_nth("PHONE #", 4) or labeled_nth("PHONE#", 4)),
@@ -224,6 +224,7 @@ def parse_rop_xlsx(path: Path, overrides: dict[str, Any] | None = None) -> Trans
         brokerage_email=brokerage.get("email", ""),
         brokerage_phone=brokerage.get("phone", ""),
     )
+    tx.title_company_address = _to_text(labeled("TITLE CO. ADDRESS", "TITLE COMPANY ADDRESS"))
 
     if not tx.agent_payee_address:
         tx.warnings.append(

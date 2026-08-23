@@ -28,6 +28,7 @@ header { padding-top: 2.5rem; }
 }
 h1 { font-size: 2rem; margin: 0 0 0.4rem; color: var(--navy); }
 .lede { color: var(--muted); margin: 0 0 1.5rem; }
+.owner-link { color: var(--navy); font-size: 0.9rem; }
 .card {
   background: white;
   border: 1px solid #e3dccf;
@@ -43,6 +44,8 @@ h1 { font-size: 2rem; margin: 0 0 0.4rem; color: var(--navy); }
   position: relative;
 }
 .dropzone.drag { background: var(--paper); }
+.upload-box label { display: flex; gap: 0.35rem; }
+.upload-box input[type="file"] { margin-top: 0.8rem; }
 .dropzone input {
   position: absolute;
   inset: 0;
@@ -91,7 +94,19 @@ button {
   cursor: pointer;
 }
 button:hover { filter: brightness(1.08); }
+.message { margin-left: 0.8rem; font-size: 0.9rem; }
+.message.success { color: #166534; }
+.message.error { color: #9a3412; }
+.owner-layout { display: grid; grid-template-columns: minmax(220px, 0.7fr) minmax(0, 1.3fr); gap: 1.25rem; }
+.submission-list { display: grid; gap: 0.5rem; }
+.submission-item { display: flex; flex-direction: column; align-items: flex-start; gap: 0.25rem; width: 100%; text-align: left; background: var(--paper); color: var(--ink); border: 1px solid #e3dccf; padding: 0.75rem; }
+.submission-item span { color: var(--muted); font-size: 0.75rem; }
+.detail { display: grid; grid-template-columns: 1fr 1fr; gap: 0.65rem 1rem; }
+.detail div { border-bottom: 1px solid #eee8de; padding-bottom: 0.45rem; }
+.detail span { display: block; color: var(--muted); font-size: 0.75rem; text-transform: capitalize; }
+.detail strong { display: block; margin-top: 0.15rem; font-weight: normal; }
 @media (max-width: 700px) {
   .grid { grid-template-columns: 1fr; }
   .wide { grid-column: auto; }
+  .owner-layout, .detail { grid-template-columns: 1fr; }
 }

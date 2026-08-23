@@ -6,8 +6,8 @@ import uuid
 from pathlib import Path
 from tempfile import NamedTemporaryFile
 
-from fastapi import FastAPI, File, Form, HTTPException, UploadFile
-from fastapi.responses import FileResponse, Response
+from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
+from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 
 from app.parser import parse_rop_xlsx, transaction_from_overrides
@@ -19,6 +19,11 @@ DB_PATH = ROOT / "submissions.db"
 
 app = FastAPI(title="CDA Generator", version="1.0.0")
 app.mount("/static", StaticFiles(directory=STATIC), name="static")
+
+
+@app.exception_handler(Exception)
+async def internal_error(request: Request, exc: Exception):
+    return JSONResponse(status_code=500, content={"detail": str(exc) or "Internal server error"})
 
 
 def db() -> sqlite3.Connection:
@@ -36,13 +41,23 @@ def db() -> sqlite3.Connection:
 
 def required_fields(payload: dict) -> list[str]:
     fields = {
+        "closer": "Escrow Agent",
+        "closer_email": "Escrow Agent's Email",
+        "closer_phone": "Escrow Agent's Phone",
+        "title_company": "Title Company",
+        "title_company_address": "Title Company Address",
+        "escrow_no": "Escrow Number",
+        "gross_commission": "Gross Commission",
+        "mls": "MLS",
+        "sale_price": "Sale Price",
         "property_address": "Property address",
         "close_date": "Closing date",
-        "sale_price": "Sale price",
         "seller": "Seller / landlord",
         "buyer": "Buyer / tenant",
         "selling_agent": "Selling agent",
-        "gross_commission": "Gross commission",
+        "broker_process_fees": "Broker Process Fees",
+        "selling_agent_commission": "Agent commission",
+        "agent_payee_address": "Agent payee mailing address",
     }
     return [label for key, label in fields.items() if not str(payload.get(key, "")).strip()]
 
@@ -89,10 +104,10 @@ async def submit(
             tmp.write(workbook)
             tmp.flush()
             tx = parse_rop_xlsx(Path(tmp.name), payload)
-    else:
-        missing = required_fields(payload)
-        if missing:
-            raise HTTPException(status_code=400, detail="Required fields missing: " + ", ".join(missing))
+    missing = required_fields(payload)
+    if missing:
+        raise HTTPException(status_code=400, detail="Required fields missing: " + ", ".join(missing))
+    if not workbook:
         tx = transaction_from_overrides(payload)
 
     submission_id = uuid.uuid4().hex[:12]
@@ -145,4 +160,8 @@ def generate_submission(submission_id: str):
         raise HTTPException(status_code=404, detail="Submission not found")
     tx = submission_transaction(row)
     pdf = build_cda_pdf(tx)
+    connection = db()
+    connection.execute("UPDATE submissions SET status = 'generated' WHERE id = ?", (submission_id,))
+    connection.commit()
+    connection.close()
     return Response(content=pdf, media_type="application/pdf", headers={"Content-Disposition": f'attachment; filename="{tx.suggested_filename()}"'})
