@@ -130,6 +130,9 @@ def _sale_checked(xlsx_path: Path) -> bool:
 def apply_overrides(tx: Transaction, overrides: dict[str, Any] | None = None) -> Transaction:
     overrides = overrides or {}
     for key, value in overrides.items():
+        if key == "title_company_address":
+            tx.title_company_address = _to_text(value)
+            continue
         if not hasattr(tx, key):
             continue
         if key == "gross_commission":

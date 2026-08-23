@@ -91,6 +91,12 @@ def required_fields(payload: dict) -> list[str]:
     return [label for key, label in fields.items() if not str(payload.get(key, "")).strip()]
 
 
+def preview_data(tx) -> dict:
+    data = tx.to_preview()
+    data["title_company_address"] = getattr(tx, "title_company_address", "")
+    return data
+
+
 @app.get("/")
 def index() -> FileResponse:
     return FileResponse(STATIC / "index.html")
@@ -141,7 +147,7 @@ async def preview(
         tmp.write(await file.read())
         tmp.flush()
         tx = parse_rop_xlsx(Path(tmp.name), payload)
-    return tx.to_preview()
+    return preview_data(tx)
 
 
 @app.post("/api/submissions")
@@ -200,7 +206,7 @@ def submission(submission_id: str, request: Request):
         row = connection.execute(select(submissions_table).where(submissions_table.c.id == submission_id)).mappings().first()
     if not row:
         raise HTTPException(status_code=404, detail="Submission not found")
-    return {"id": row["id"], "created_at": row["created_at"], "status": row["status"], "filename": row["filename"], "preview": submission_transaction(row).to_preview()}
+    return {"id": row["id"], "created_at": row["created_at"], "status": row["status"], "filename": row["filename"], "preview": preview_data(submission_transaction(row))}
 
 
 @app.delete("/api/submissions/{submission_id}")
