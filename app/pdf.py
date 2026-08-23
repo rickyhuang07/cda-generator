@@ -242,12 +242,9 @@ def build_cda_pdf(tx: Transaction) -> bytes:
         Spacer(1, 14),
     ]
 
-    # Signature Block
-    # 1. Signature image
     sig_image = Image("static/signature.png", width=90, height=25)
     sig_image.hAlign = 'LEFT'
 
-    # 3-Column Table: Left (Signature), Middle (Spacer Gap), Right (Date)
     sig = Table(
         [
             [

@@ -119,6 +119,45 @@ def _sale_checked(xlsx_path: Path) -> bool:
         return True
 
 
+def apply_overrides(tx: Transaction, overrides: dict[str, Any] | None = None) -> Transaction:
+    overrides = overrides or {}
+    for key, value in overrides.items():
+        if not hasattr(tx, key):
+            continue
+        if key == "gross_commission":
+            parsed_gross = _to_number(value)
+            tx._gross_commission_override = parsed_gross
+            tx.total_commission = parsed_gross
+            continue
+        current = getattr(tx, key)
+        if isinstance(current, float):
+            setattr(tx, key, _to_number(value))
+        elif isinstance(current, date) or key in {"today", "close_date"}:
+            setattr(tx, key, _to_date(value))
+        elif isinstance(current, bool):
+            setattr(tx, key, str(value).lower() in {"1", "true", "yes", "sale"})
+        else:
+            setattr(tx, key, _to_text(value))
+    return tx
+
+
+def transaction_from_overrides(overrides: dict[str, Any] | None = None) -> Transaction:
+    defaults = load_defaults()
+    brokerage = defaults.get("brokerage", {})
+    broker = defaults.get("broker", {})
+    tx = Transaction(
+        agent_payee_address="",
+        broker_name=broker.get("name", ""),
+        brokerage_name=brokerage.get("name", ""),
+        brokerage_mail_address=", ".join(
+            p for p in [brokerage.get("address_line1", ""), brokerage.get("address_line2", "")] if p
+        ),
+        brokerage_email=brokerage.get("email", ""),
+        brokerage_phone=brokerage.get("phone", ""),
+    )
+    return apply_overrides(tx, overrides)
+
+
 def parse_rop_xlsx(path: Path, overrides: dict[str, Any] | None = None) -> Transaction:
     defaults = load_defaults()
     overrides = overrides or {}
@@ -192,17 +231,4 @@ def parse_rop_xlsx(path: Path, overrides: dict[str, Any] | None = None) -> Trans
             "Add it in the form or in config/defaults.json."
         )
 
-    for key, value in overrides.items():
-        if not hasattr(tx, key) or value in (None, ""):
-            continue
-        current = getattr(tx, key)
-        if isinstance(current, float):
-            setattr(tx, key, _to_number(value))
-        elif isinstance(current, date) or key in {"today", "close_date"}:
-            setattr(tx, key, _to_date(value))
-        elif isinstance(current, bool):
-            setattr(tx, key, str(value).lower() in {"1", "true", "yes", "sale"})
-        else:
-            setattr(tx, key, _to_text(value))
-
-    return tx
+    return apply_overrides(tx, overrides)
