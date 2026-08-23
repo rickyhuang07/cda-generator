@@ -94,10 +94,14 @@ button {
   cursor: pointer;
 }
 button:hover { filter: brightness(1.08); }
+button.danger { background: #9a3412; }
 .message { margin-left: 0.8rem; font-size: 0.9rem; }
 .message.success { color: #166534; }
 .message.error { color: #9a3412; }
 .owner-layout { display: grid; grid-template-columns: minmax(220px, 0.7fr) minmax(0, 1.3fr); gap: 1.25rem; }
+.owner-content { display: contents; }
+.owner-content.hidden { display: none; }
+.login-form { display: flex; align-items: end; gap: 1rem; }
 .submission-list { display: grid; gap: 0.5rem; }
 .submission-item { display: flex; flex-direction: column; align-items: flex-start; gap: 0.25rem; width: 100%; text-align: left; background: var(--paper); color: var(--ink); border: 1px solid #e3dccf; padding: 0.75rem; }
 .submission-item span { color: var(--muted); font-size: 0.75rem; }

@@ -14,17 +14,27 @@
     <a class="owner-link" href="/">Submitter view</a>
   </header>
   <main class="owner-layout">
+    <section class="card" id="login-card">
+      <h2>Owner sign in</h2>
+      <form id="login-form" class="login-form">
+        <label>Password <input id="owner-password" type="password" required /></label>
+        <button type="submit">Sign in</button>
+        <span id="login-message" class="message" role="status"></span>
+      </form>
+    </section>
+    <div id="owner-content" class="owner-content hidden">
     <section class="card">
-      <div class="section-head"><h2>Inbox</h2><button id="refresh" type="button">Refresh</button></div>
+      <div class="section-head"><h2>Inbox</h2><div><button id="refresh" type="button">Refresh</button><button id="logout" type="button">Sign out</button></div></div>
       <div id="submission-list" class="submission-list"><p class="hint">Loading submissions...</p></div>
     </section>
     <section class="card" id="detail-card">
       <h2>Submission details</h2>
       <p id="empty-detail" class="hint">Select a submission to review.</p>
       <div id="detail" class="detail hidden"></div>
-      <div class="actions"><button id="generate" type="button" disabled>Generate CDA PDF</button><span id="owner-message" class="message" role="status"></span></div>
+      <div class="actions"><button id="generate" type="button" disabled>Generate CDA PDF</button><button id="delete" class="danger" type="button" disabled>Delete submission</button><span id="owner-message" class="message" role="status"></span></div>
     </section>
+    </div>
   </main>
-  <script src="/static/owner.js?v=1"></script>
+  <script src="/static/owner.js?v=2"></script>
 </body>
 </html>

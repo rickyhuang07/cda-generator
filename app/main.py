@@ -1,6 +1,9 @@
 from __future__ import annotations
 
 import json
+import hashlib
+import hmac
+import os
 import sqlite3
 import uuid
 from pathlib import Path
@@ -9,13 +12,18 @@ from tempfile import NamedTemporaryFile
 from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
+from dotenv import load_dotenv
 
 from app.parser import parse_rop_xlsx, transaction_from_overrides
 from app.pdf import build_cda_pdf
 
 ROOT = Path(__file__).resolve().parent.parent
 STATIC = ROOT / "static"
-DB_PATH = ROOT / "submissions.db"
+load_dotenv(ROOT / ".env")
+DB_PATH = Path(os.getenv("DATABASE_PATH", ROOT / "submissions.db"))
+OWNER_PASSWORD = os.getenv("OWNER_PASSWORD", "")
+SESSION_SECRET = os.getenv("SESSION_SECRET", "local-development-secret")
+COOKIE_SECURE = os.getenv("COOKIE_SECURE", "false").lower() == "true"
 
 app = FastAPI(title="CDA Generator", version="1.0.0")
 app.mount("/static", StaticFiles(directory=STATIC), name="static")
@@ -27,6 +35,7 @@ async def internal_error(request: Request, exc: Exception):
 
 
 def db() -> sqlite3.Connection:
+    DB_PATH.parent.mkdir(parents=True, exist_ok=True)
     connection = sqlite3.connect(DB_PATH)
     connection.row_factory = sqlite3.Row
     connection.execute(
@@ -37,6 +46,14 @@ def db() -> sqlite3.Connection:
     )
     connection.commit()
     return connection
+
+
+def require_owner(request: Request) -> None:
+    if not OWNER_PASSWORD:
+        return
+    expected = hmac.new(SESSION_SECRET.encode(), b"owner", hashlib.sha256).hexdigest()
+    if not hmac.compare_digest(request.cookies.get("owner_session", ""), expected):
+        raise HTTPException(status_code=401, detail="Owner login required")
 
 
 def required_fields(payload: dict) -> list[str]:
@@ -70,6 +87,30 @@ def index() -> FileResponse:
 @app.get("/owner")
 def owner() -> FileResponse:
     return FileResponse(STATIC / "owner.html")
+
+
+@app.get("/health")
+def health():
+    connection = db()
+    connection.close()
+    return {"status": "ok"}
+
+
+@app.post("/api/owner/login")
+def owner_login(password: str = Form(...)):
+    if not OWNER_PASSWORD or not hmac.compare_digest(password, OWNER_PASSWORD):
+        raise HTTPException(status_code=401, detail="Invalid owner password")
+    expected = hmac.new(SESSION_SECRET.encode(), b"owner", hashlib.sha256).hexdigest()
+    response = JSONResponse({"message": "Signed in"})
+    response.set_cookie("owner_session", expected, httponly=True, secure=COOKIE_SECURE, samesite="lax", max_age=86400)
+    return response
+
+
+@app.post("/api/owner/logout")
+def owner_logout():
+    response = JSONResponse({"message": "Signed out"})
+    response.delete_cookie("owner_session")
+    return response
 
 
 @app.post("/api/preview")
@@ -122,7 +163,8 @@ async def submit(
 
 
 @app.get("/api/submissions")
-def submissions():
+def submissions(request: Request):
+    require_owner(request)
     connection = db()
     rows = connection.execute(
         "SELECT id, created_at, status, filename, overrides FROM submissions ORDER BY created_at DESC"
@@ -132,13 +174,26 @@ def submissions():
 
 
 @app.get("/api/submissions/{submission_id}")
-def submission(submission_id: str):
+def submission(submission_id: str, request: Request):
+    require_owner(request)
     connection = db()
     row = connection.execute("SELECT * FROM submissions WHERE id = ?", (submission_id,)).fetchone()
     connection.close()
     if not row:
         raise HTTPException(status_code=404, detail="Submission not found")
     return {"id": row["id"], "created_at": row["created_at"], "status": row["status"], "filename": row["filename"], "preview": submission_transaction(row).to_preview()}
+
+
+@app.delete("/api/submissions/{submission_id}")
+def delete_submission(submission_id: str, request: Request):
+    require_owner(request)
+    connection = db()
+    cursor = connection.execute("DELETE FROM submissions WHERE id = ?", (submission_id,))
+    connection.commit()
+    connection.close()
+    if cursor.rowcount == 0:
+        raise HTTPException(status_code=404, detail="Submission not found")
+    return {"id": submission_id, "message": "Submission deleted."}
 
 
 def submission_transaction(row: sqlite3.Row):
@@ -152,7 +207,8 @@ def submission_transaction(row: sqlite3.Row):
 
 
 @app.post("/api/submissions/{submission_id}/generate")
-def generate_submission(submission_id: str):
+def generate_submission(submission_id: str, request: Request):
+    require_owner(request)
     connection = db()
     row = connection.execute("SELECT * FROM submissions WHERE id = ?", (submission_id,)).fetchone()
     connection.close()

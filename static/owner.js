@@ -3,11 +3,17 @@ document.addEventListener("DOMContentLoaded", () => {
   const detail = document.getElementById("detail");
   const empty = document.getElementById("empty-detail");
   const generate = document.getElementById("generate");
+  const deleteButton = document.getElementById("delete");
   const message = document.getElementById("owner-message");
+  const loginCard = document.getElementById("login-card");
+  const ownerContent = document.getElementById("owner-content");
+  const loginForm = document.getElementById("login-form");
+  const loginMessage = document.getElementById("login-message");
   let selectedId = null;
 
   async function loadSubmissions() {
     const response = await fetch("/api/submissions");
+    if (response.status === 401) return false;
     const submissions = await response.json();
     list.innerHTML = submissions.length ? "" : '<p class="hint">No submissions yet.</p>';
     submissions.forEach((submission) => {
@@ -22,6 +28,7 @@ document.addEventListener("DOMContentLoaded", () => {
       button.addEventListener("click", () => selectSubmission(submission.id));
       list.appendChild(button);
     });
+    return true;
   }
 
   async function selectSubmission(id) {
@@ -43,9 +50,42 @@ document.addEventListener("DOMContentLoaded", () => {
         detail.appendChild(item);
       });
     generate.disabled = false;
+    deleteButton.disabled = false;
   }
 
   document.getElementById("refresh").addEventListener("click", loadSubmissions);
+  loginForm.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const body = new FormData();
+    body.append("password", document.getElementById("owner-password").value);
+    const response = await fetch("/api/owner/login", { method: "POST", body });
+    if (!response.ok) { loginMessage.textContent = "Invalid password."; return; }
+    loginCard.classList.add("hidden");
+    ownerContent.classList.remove("hidden");
+    await loadSubmissions();
+  });
+  document.getElementById("logout").addEventListener("click", async () => {
+    await fetch("/api/owner/logout", { method: "POST" });
+    ownerContent.classList.add("hidden");
+    loginCard.classList.remove("hidden");
+  });
+  deleteButton.addEventListener("click", async () => {
+    if (!selectedId || !window.confirm("Delete this submission permanently?")) return;
+    deleteButton.disabled = true;
+    const response = await fetch(`/api/submissions/${selectedId}`, { method: "DELETE" });
+    if (!response.ok) {
+      message.textContent = "Could not delete submission.";
+      deleteButton.disabled = false;
+      return;
+    }
+    selectedId = null;
+    detail.replaceChildren();
+    detail.classList.add("hidden");
+    empty.classList.remove("hidden");
+    generate.disabled = true;
+    message.textContent = "Submission deleted.";
+    await loadSubmissions();
+  });
   generate.addEventListener("click", async () => {
     if (!selectedId) return;
     generate.disabled = true;
@@ -60,5 +100,7 @@ document.addEventListener("DOMContentLoaded", () => {
     message.textContent = "PDF generated.";
     generate.disabled = false;
   });
-  loadSubmissions().catch(() => { list.innerHTML = '<p class="message error">Could not load submissions.</p>'; });
+  loadSubmissions().then((authenticated) => {
+    if (authenticated) { loginCard.classList.add("hidden"); ownerContent.classList.remove("hidden"); }
+  }).catch(() => { list.innerHTML = '<p class="message error">Could not load submissions.</p>'; });
 });
