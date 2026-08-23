@@ -118,7 +118,6 @@ document.addEventListener("DOMContentLoaded", () => {
     message.textContent = "PDF generated.";
     generate.disabled = false;
   });
-  loadSubmissions().then((authenticated) => {
-    if (authenticated) { loginCard.classList.add("hidden"); ownerContent.classList.remove("hidden"); }
-  }).catch(() => { list.innerHTML = '<p class="message error">Could not load submissions.</p>'; });
+  loginCard.classList.remove("hidden");
+  ownerContent.classList.add("hidden");
 });

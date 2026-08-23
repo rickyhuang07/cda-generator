@@ -106,6 +106,7 @@ def index() -> FileResponse:
 def owner() -> FileResponse:
     response = FileResponse(STATIC / "owner.html")
     response.delete_cookie("owner_session")
+    response.headers["Cache-Control"] = "no-store"
     return response
 
 
